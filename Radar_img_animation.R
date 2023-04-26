@@ -115,6 +115,10 @@ df_try <- as.data.frame(all_raster_list[[1]], xy = TRUE, na.rm = TRUE)
 df_try_name <- strsplit(names(all_raster_list[[1]]), split = "dBZ")[[1]][1]
 df_try_name <- strsplit(df_try_name, split = "\\.")[[1]][1]
 
+# date sequence
+df_time <- seq(as.POSIXct("2022-7-4 8:00"), as.POSIXct("2022-7-4 23:55"), by = "5 min")
+
+
 str(df_try)
 
 #rename bands to RGB
@@ -138,8 +142,8 @@ p <- ggplot() +
                fill = NA, alpha = 0.3, colour = "white", size = 1, linetype = 2) +
   geom_polygon(data = basin_shp2, aes(x = long, y = lat, group = group), 
                fill = NA, alpha = 0.3, colour = "red", size = 1) +
-  coord_fixed(xlim=c(100.1, 101.6), ylim=c(5.2, 6.3)) +
-  #labs(title = date) +
+  coord_fixed(xlim=c(100.2, 101.1), ylim=c(5.2, 6.1)) +
+  labs(title = paste0("WSDS Bayan Lepas (CAPPI) ", df_time[1])) +
   #theme(plot.background = element_rect(fill = "black")) +
   theme_void()
 
@@ -149,6 +153,17 @@ p
 
 ##########
 # CREATE LIST OF ALL MAPS
+
+
+# date sequence
+df_time <- seq(as.POSIXct("2022-7-4 8:00"), as.POSIXct("2022-7-4 23:55"), by = "5 min")
+
+# remove missing dates from sequence
+remove_dates <- as.POSIXct(c("2022-7-4 16:35", "2022-7-4 19:35", "2022-7-4 20:35", "2022-7-4 23:45"))
+df_time <- df_time[!df_time %in% remove_dates]
+
+
+# loop map plotting
 
 maplist <- list()
 
@@ -180,7 +195,8 @@ for (j in 1:length(all_raster_list)) {
                  fill = NA, alpha = 0.3, colour = "white", size = 1, linetype = 2) +
     geom_polygon(data = basin_shp2, aes(x = long, y = lat, group = group), 
                  fill = NA, alpha = 0.3, colour = "red", size = 1) +
-    coord_fixed(xlim = c(100.1, 101.6), ylim = c(5.2, 6.3)) +
+    coord_fixed(xlim = c(100.2, 101.1), ylim = c(5.2, 6.1)) +
+    labs(title = paste0("WSDS Bayan Lepas (CAPPI) ", df_time[j])) +
     theme_void()
   
 
@@ -190,6 +206,8 @@ for (j in 1:length(all_raster_list)) {
   
 }
 
+
+maplist[[97]]
 
 #if cannot plot, try
 dev.off()
@@ -212,7 +230,7 @@ saveGIF({
     
   }
   
-}, movie.name = 'animation.gif', interval = 0.2, ani.width = 700, ani.height = 500)
+}, movie.name = 'WSDSBayanLepas_20220704_Kupang_zoom.gif', interval = 0.2, ani.width = 600, ani.height = 500)
 
 
 ##########
@@ -225,3 +243,108 @@ saveGIF({
 
 #stackSave(all_raster_list,"WSDS_BayanLepas_20220704_Kupang.tif")
 
+
+
+##########
+# SAVE PLOTS IN LIST INDIVIDUALLY
+
+
+# Save plots to tiff. Makes a separate file for each plot.
+save_path <- "J:/Backup_main/2023/20220705_Banjir_Baling/Analysis/MMD/BayanLepas_20220704_png/"
+
+k = 97
+
+for (k in 97:121) {
+  ggsave(maplist[[k]], file = paste0(save_path, "BayanLepas_20220704_", k, ".png"), scale = 1.5,
+         dpi = 300, width = 10, height = 10, units = "cm")
+}
+
+
+##########
+# SAVE PLOTS IN LIST AS FACET MAP
+
+library(gridExtra)
+
+# replot selected range only (time as title only)
+
+maplist_sel <- list()
+
+m = 1
+
+for (m in 97:120) {
+  
+  date <- format(as.POSIXct(df_time[m]), format = "%H:%M")
+  
+  # show points for each day
+  #sel_pt <- RF_data_day_stn %>% 
+  #  filter(Date == date)
+  
+  df_raster <- as.data.frame(all_raster_list[[m]], xy = TRUE, na.rm = TRUE)
+  
+  #rename bands to RGB
+  colnames(df_raster)[3:5] <- c("Red", "Green", "Blue")
+  
+  # plot map
+  s <- ggplot() + 
+    geom_raster(data = df_raster, aes(x = x, y = y),
+                fill = rgb(r = df_raster$Red,
+                           g = df_raster$Green,
+                           b = df_raster$Blue,
+                           maxColorValue = 255),
+                show.legend = FALSE) +
+    scale_fill_identity() + 
+    geom_polygon(data = sel_shp2, aes(x = long, y = lat, group = group), 
+                 fill = NA, alpha = 0.3, colour = "white", size = 1, linetype = 2) +
+    geom_polygon(data = basin_shp2, aes(x = long, y = lat, group = group), 
+                 fill = NA, alpha = 0.3, colour = "red", size = 1) +
+    coord_fixed(xlim = c(100.2, 101.1), ylim = c(5.2, 6.1)) +
+    labs(title = date) +
+    theme_void()
+  
+  
+  
+  maplist_sel[[m]] <- s
+  
+  
+}
+
+
+
+# get legend
+
+mylegend <- ggplot() + 
+  geom_raster(data = df_try, aes(x = x, y = y),
+              fill = rgb(r = df_try$Red,
+                         g = df_try$Green,
+                         b = df_try$Blue,
+                         maxColorValue = 255),
+              show.legend = FALSE) +
+  scale_fill_identity() + 
+  coord_fixed(xlim = c(101.3, 101.6), ylim = c(5.1, 5.98)) +
+  theme_void()
+
+mylegend
+
+
+
+# arrange facet map
+facet_map <- grid.arrange(grobs = maplist_sel[97:108], ncol = 4)
+
+facet_map2 <- grid.arrange(grobs = maplist_sel[109:120], ncol = 4)
+
+## title font format
+title = grid::textGrob(paste0("Sg Kupang Basin from MMD WSDS Bayan Lepas (CAPPI) 2022-07-04"), 
+                       gp = grid::gpar(fontsize = 14))
+
+# arrange whole page
+facet_legend_map <- grid.arrange(facet_map, mylegend, 
+                                 top = title, 
+                                 #nrow = 2, heights = c(9, 1)
+                                 ncol = 2, widths = c(9, 1)
+)
+
+
+
+#print last plot to file
+ggsave(paste0(save_path, "WSDSBayanLepas_Kupang_20220704_facet1600.png"), facet_legend_map, dpi = 400,
+       width = 17, height = 10, units = "in")
